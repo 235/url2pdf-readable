@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+FIREFOX_BIN="firefox"
+CHROME_BIN="google-chrome"
+progname=$(basename $0)
+
+# ==== Usage
+function usage()
+{
+   cat << HEREDOC
+
+   Usage: $progname [URL] [PDF_OUT_FILE] [--readable] [--verbose]
+    URL                link to "print" into a PDF file
+    PDF_OUT_FILE       name of the output PDF file
+
+   Optional arguments:
+     -f, --firefox     (default) use "$FIREFOX_BIN" to render a PDF file
+     (TBD) -c, --chrome      use "$CHROME_BIN" to render a PDF file
+     -r, --readable    covert URL webpage into a "readable" article
+     -s, --scroll      scroll through the article to load lazy images
+     -v, --verbose     increase the verbosity
+     -h, --help        show this help message and exit
+   (The last -c or -f option takes priority)
+
+HEREDOC
+}  
+
+
+# ==== Parse params
+# need to convert to a full path, otherwise browser default takes over
+convert2fullpath() 
+{
+  dir=$(dirname $1)
+  cd "$dir" 2>/dev/null || return $?  # cd to desired directory; if fail, quell any error messages but return exit status
+  echo "`pwd -P`" # output full, link-resolved path
+}
+
+url="$1"
+pdf="$(convert2fullpath $2)/$(basename $2)"
+shift 2
+[[ -z "$url" || -z "$pdf" ]] && { usage; exit 1; }
+[[ -f "$pdf" ]] && { echo "PDF file {$pdf} already exists"; exit 1; }
+
+# use getopt and store the output into $OPTS
+# note the use of -o for the short options, --long for the long name options
+# and a : for any option that takes a parameter
+OPTS=$(getopt -o "fcrsvh" --long "firefox,chrome,readable,scroll,verbose,help" -n "$progname" -- "$@")
+if [ $? != 0 ] ; then echo "Error in command line arguments." >&2 ; usage; exit 1 ; fi
+eval set -- "$OPTS"
+
+verbose=0
+readable=0
+scroll=0
+firefox=1
+chrome=0
+while true; do
+  # uncomment the next line to see how shift is working
+  # echo "\$1:\"$1\" \$2:\"$2\""
+  case "$1" in
+    -h | --help ) usage; exit; ;;
+    -r | --readable ) readable=1; shift ;;
+    -s | --scroll ) scroll=1; shift ;;    
+    -f | --firefox ) firefox=1; chrome=0; shift ;;
+    -c | --chrome ) chrome=1; firefox=0; shift ;;
+    -v | --verbose ) verbose=$((verbose + 1)); shift ;;
+    -- ) shift; break ;;
+    * ) break ;;
+  esac
+done
+
+
+# ==== Vebose
+if (( $verbose > 0 )); then
+  # print out all the parameters we read in
+  cat <<EOM
+  Input:
+    ulr=$url
+    pdf=$pdf
+    firefox=$firefox
+    chrome=$chrome
+    readable=$readable
+    verbose=$verbose
+EOM
+fi
+
+
+# ==== Firefox in Xvfb with xdotool
+url2pdf_firefox() {
+  if (( $readable > 0 )); then
+    # Add a param to launch a built-in reader addon
+    url="about:reader?url=$url"
+  fi
+
+
+  # Create new Firefox profile 
+  PROFILE="firefox_print_profile"
+  PROFILE_PATH=`pwd`"/$PROFILE"
+  if [ ! -d "$PROFILE_PATH" ]; then
+    firefox -CreateProfile "$PROFILE $PROFILE_PATH"
+    sleep 1
+  fi
+  
+  # Configure printing, readability and suppers notices
+  cat <<EOM > $PROFILE_PATH/user.js
+user_pref("datareporting.policy.firstRunURL", "");
+user_pref("browser.tabs.warnOnClose", "false");
+
+user_pref("reader.font_size", "3");
+user_pref("reader.font_type", "serif");
+user_pref("reader.content_width", "4");
+
+user_pref("print.print_footercenter", "");
+user_pref("print.print_footerleft", "");
+user_pref("print.print_footerright", "&PT"); 
+user_pref("print.print_headercenter", "");
+user_pref("print.print_headerleft", "");
+user_pref("print.print_headerright", "");
+user_pref("print.printer_Print_to_File.print_footercenter", "");
+user_pref("print.printer_Print_to_File.print_footerleft", "");
+user_pref("print.printer_Print_to_File.print_footerright", "&PT"); 
+user_pref("print.printer_Print_to_File.print_headercenter", "");
+user_pref("print.printer_Print_to_File.print_headerleft", "");
+user_pref("print.printer_Print_to_File.print_headerright", "");
+
+user_pref("print.print_paper_id", "iso_a4");
+user_pref("print.print_paper_height", "11.6929");
+user_pref("print.print_paper_width", "8.26772");
+user_pref("print.printer_Print_to_File.print_paper_id", "iso_a4");
+user_pref("print.printer_Print_to_File.print_paper_height", "11.6929");  
+user_pref("print.printer_Print_to_File.print_paper_width", "8.26772");
+
+user_pref("print.print_to_filename", "$pdf");
+user_pref("print.printer_Print_to_File.print_to_filename", "$pdf");
+EOM
+
+  # Launch a virtual framebuffer
+  DISPLAY_NUM=42
+  export DISPLAY=:$DISPLAY_NUM
+  Xvfb $DISPLAY -screen 0 1024x1024x24 &
+  sleep 2
+  # Uncommet to run a VNC server and connect to debug with any VNC client (localhost:5900 default) 
+  # x11vnc -display $DISPLAY -bg -forever -nopw -quiet -listen localhost -xkb; sleep 2
+
+  # Run & wait to load
+  firefox -P $PROFILE --no-remote $url &
+  xdotool sleep 8  # wait to load
+  
+  if (( $scroll > 0 )); then
+    # Scroll through the whole page to load lazy elements
+    for i in $(seq 100); do xdotool key space; done
+    xdotool sleep 4  # wait to load
+  fi
+
+  # Print 
+  xdotool key "ctrl+p"  # print dialog
+  xdotool key Up  # move to the top printer "Prit to File"
+  xdotool key Up
+  xdotool sleep 1
+  xdotool key Tab # move to "print"
+  xdotool key Return
+  xdotool sleep 2
+  # Wait until 30sec timeout, or the print window is gone
+  c=0
+  while [ $c -le 30 -a $(xdotool search --name "^Printing$" | wc -l) -gt 0 ]; do
+      xdotool sleep 1
+      ((c+=1))
+  done
+
+  # Close gracefully
+  xdotool key "ctrl+shift+w" # close window
+  xdotool key Return
+  sleep 2
+  kill `cat /tmp/.X$DISPLAY_NUM-lock`
+}
+
+
+url2pdf_firefox
