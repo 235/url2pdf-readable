@@ -41,7 +41,12 @@ Dependencies:
 Alternatives, and why they didn't work for me:
   1. `weasyprint` or `xhtml2pdf` are good reporting engines for HTML to PDF, but they require manual pagination, do not offer "readability" option.
   2. several solutions based on Node.js
- 
+
+## Install
+
+Copy the script, or deploy with `pip`:
+  ```pip install git+https://github.com/235/url2pdf-readable.git```
+
 ## Platforms:
  - Linux
  - other Unix and MacOs could work
