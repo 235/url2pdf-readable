@@ -8,13 +8,13 @@ See how [the article](https://writings.stephenwolfram.com/2019/07/mitchell-feige
 
 Command line options:
 ```
-   Usage: $progname [URL] [PDF_OUT_FILE] [--readable] [--verbose]
+   Usage: url2pdf-readable [URL] [PDF_OUT_FILE] [--readable] [--verbose]
     URL                link to "print" into a PDF file
     PDF_OUT_FILE       name of the output PDF file
 
    Optional arguments:
      -f, --firefox     (default) use "$FIREFOX_BIN" to render a PDF file
-     (TBD) -c, --chrome      use "$CHROME_BIN" to render a PDF file
+     (TBD) -c, --chrome use "$CHROME_BIN" to render a PDF file
      -d n, --delay n   "n" seconds delay to download & render all images (10sec default)
      -r, --readable    covert URL webpage into a "readable" article
      -s, --scroll      scroll through the article to load lazy images
