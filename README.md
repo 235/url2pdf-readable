@@ -2,9 +2,26 @@
 Scripts to convent a web article (URL) to a readable PDF. Designed to read web articles on e-readers.
 
 Example:
-`url2pdf-readable https://www.theguardian.com/tv-and-radio/2020/dec/15/the-archers-weird-genius-peculiarly-english-epic aaba21.pdf -f -v -r -s`
+`./url2pdf-readable https://writings.stephenwolfram.com/2019/07/mitchell-feigenbaum-1944-2019-4-66920160910299067185320382/ example_article.pdf --readable --scroll --delay 10`
 
-See `example_article.pdf` as output.
+See how [the article](https://writings.stephenwolfram.com/2019/07/mitchell-feigenbaum-1944-2019-4-66920160910299067185320382/) got converted into [`example_article.pdf`](https://github.com/235/url2pdf-readable/blob/main/example_article.pdf) output.
+
+Command line options:
+```
+   Usage: $progname [URL] [PDF_OUT_FILE] [--readable] [--verbose]
+    URL                link to "print" into a PDF file
+    PDF_OUT_FILE       name of the output PDF file
+
+   Optional arguments:
+     -f, --firefox     (default) use "$FIREFOX_BIN" to render a PDF file
+     (TBD) -c, --chrome      use "$CHROME_BIN" to render a PDF file
+     -d n, --delay n   "n" seconds delay to download & render all images (10sec default)
+     -r, --readable    covert URL webpage into a "readable" article
+     -s, --scroll      scroll through the article to load lazy images
+     -v, --verbose     increase the verbosity
+     -h, --help        show this help message and exit
+   (The last -c or -f option takes priority)
+```
 
 ## How does it render a readable URL?
 
